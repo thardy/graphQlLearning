@@ -1,5 +1,5 @@
 const {GraphQLDateTime} = require('graphql-iso-date');
-const {GraphQLSchema, GraphQLObjectType, GraphQLID, GraphQLString, GraphQLFloat, GraphQLInt, GraphQLNonNull} = require('graphql');
+const {GraphQLSchema, GraphQLObjectType, GraphQLInputObjectType, GraphQLID, GraphQLString, GraphQLFloat, GraphQLInt, GraphQLNonNull} = require('graphql');
 
 const fakeDatabase = {
     categories: {
@@ -16,26 +16,26 @@ const fakeDatabase = {
             name: 'This is Good Category',
         },
     },
-    products: {
-        'one': {
-            id: 'one',
+    products: [
+        {
+            id: 1,
             name: 'This is Product One',
             description: 'Descriptions are for losers.',
             price: 10.99
         },
-        'two': {
-            id: 'two',
+        {
+            id: 2,
             name: 'This is Product Two',
             description: 'Descriptions are for losers.',
             price: 0.99
         },
-        'three': {
-            id: 'three',
+        {
+            id: 3,
             name: 'This is Product Three',
             description: 'Descriptions are for losers.',
             price: 19.99
         },
-    }
+    ]
 };
 
 const CategoryType = new GraphQLObjectType({
@@ -83,6 +83,15 @@ const ProductType = new GraphQLObjectType({
     })
 });
 
+const ProductInputType = new GraphQLInputObjectType({
+    name: 'ProductInputType',
+    fields: () => ({
+        id: { type: GraphQLInt },
+        name: { type: GraphQLString },
+        quantity: { type: GraphQLInt },
+    }),
+});
+
 const rootQueryFields = {
     // categories: {
     //     type: CategoryType,
@@ -94,10 +103,35 @@ const rootQueryFields = {
     products: {
         type: ProductType,
         args: {
-            id: { type: GraphQLString }
+            filter: { type: ProductInputType }
         },
-        resolve: (_, {id}) => {
-            return fakeDatabase.products[id];
+        resolve: (_, {filter}) => {
+            return fakeDatabase.products.find((product) => {
+                let found = false;
+                const idFilterPresent = !!filter.id;
+                const nameFilterPresent = !!filter.name;
+                const quantityFilterPresent = !!filter.quantity;
+
+                if (idFilterPresent) {
+                    found = product.id === filter.id;
+                    if (!found) {
+                        return false;
+                    }
+                }
+                if (nameFilterPresent) {
+                    found = product.name.toLowerCase().includes(filter.name.toLowerCase());
+                    if (!found) {
+                        return false;
+                    }
+                }
+                if (quantityFilterPresent) {
+                    found = product.quantity === filter.quantity;
+                    if (!found) {
+                        return false;
+                    }
+                }
+                return found;
+            });
         }
     }
 };
