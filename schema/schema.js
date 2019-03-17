@@ -1,36 +1,37 @@
 const {GraphQLDateTime} = require('graphql-iso-date');
-const {GraphQLSchema, GraphQLObjectType, GraphQLInputObjectType, GraphQLID, GraphQLString, GraphQLFloat, GraphQLInt, GraphQLNonNull} = require('graphql');
+const {GraphQLSchema, GraphQLObjectType, GraphQLInputObjectType, GraphQLList, GraphQLID, GraphQLString, GraphQLFloat, GraphQLInt, GraphQLNonNull} = require('graphql');
+const ObjectId = require('mongodb').ObjectID;
 
 const fakeDatabase = {
     categories: {
         'bad': {
-            id: 'bad',
-            name: 'This is Bad Category',
+            _id: '5c8b9ddf972be631fa099720',
+            name: 'bad',
         },
         'mediocre': {
-            id: 'mediocre',
-            name: 'This is Mediocre Category',
+            _id: '5c8b9ded972be631fa099721',
+            name: 'mediocre',
         },
         'good': {
-            id: 'good',
-            name: 'This is Good Category',
+            _id: '5c8b9df9972be631fa099722',
+            name: 'good',
         },
     },
     products: [
         {
-            id: 1,
+            _id: '5c8b9e1a972be631fa099723',
             name: 'This is Product One',
             description: 'Descriptions are for losers.',
             price: 10.99
         },
         {
-            id: 2,
+            _id: '5c8b9e2c972be631fa099724',
             name: 'This is Product Two',
             description: 'Descriptions are for losers.',
             price: 0.99
         },
         {
-            id: 3,
+            _id: '5c8b9e37972be631fa099725',
             name: 'This is Product Three',
             description: 'Descriptions are for losers.',
             price: 19.99
@@ -59,34 +60,20 @@ const CategoryType = new GraphQLObjectType({
 const ProductType = new GraphQLObjectType({
     name: 'ProductType',
     fields: () => ({
-        _id: {
-            type: GraphQLID
-        },
-        name: {
-            type: GraphQLString
-        },
-        description: {
-            type: GraphQLString
-        },
-        price: {
-            type: GraphQLFloat
-        },
-        quantity: {
-            type: GraphQLInt
-        },
-        category: {
-            type: CategoryType
-        },
-        created: {
-            type: GraphQLDateTime
-        }
+        _id: { type: GraphQLID },
+        name: { type: GraphQLString },
+        description: { type: GraphQLString },
+        price: { type: GraphQLFloat },
+        // quantity: { type: GraphQLInt },
+        // category: { type: CategoryType },
+        // created: { type: GraphQLDateTime }
     })
 });
 
 const ProductInputType = new GraphQLInputObjectType({
     name: 'ProductInputType',
     fields: () => ({
-        id: { type: GraphQLInt },
+        _id: { type: GraphQLID },
         name: { type: GraphQLString },
         quantity: { type: GraphQLInt },
     }),
@@ -100,20 +87,27 @@ const rootQueryFields = {
     //     },
     //     resolve: ???
     // },
+    // info: {
+    //     type: GraphQLString,
+    //     resolve: () => `This is my practice, manually-created GraphQL Api!!!`
+    // },
     products: {
-        type: ProductType,
+        type: new GraphQLList(ProductType),
         args: {
             filter: { type: ProductInputType }
         },
         resolve: (_, {filter}) => {
-            return fakeDatabase.products.find((product) => {
+            const results = fakeDatabase.products.filter((product) => {
+                if (!filter) {
+                    return true;
+                }
                 let found = false;
-                const idFilterPresent = !!filter.id;
+                const idFilterPresent = !!filter._id;
                 const nameFilterPresent = !!filter.name;
                 const quantityFilterPresent = !!filter.quantity;
 
                 if (idFilterPresent) {
-                    found = product.id === filter.id;
+                    found = product._id === filter._id;
                     if (!found) {
                         return false;
                     }
@@ -130,8 +124,14 @@ const rootQueryFields = {
                         return false;
                     }
                 }
+                if (!idFilterPresent && !nameFilterPresent && !quantityFilterPresent) {
+                    found = true;
+                }
                 return found;
             });
+
+            return results;
+
         }
     }
 };
@@ -141,10 +141,21 @@ const rootQuery = new GraphQLObjectType({
     fields: rootQueryFields
 });
 
-// const rootMutationFields = {
-//
-// };
-//
+const rootMutationFields = {
+    // create_products: {
+    //     type: ProductType,
+    //     args: {
+    //         _id: { type: GraphQLID },
+    //         name: { type: GraphQLString },
+    //         description: { type: GraphQLString },
+    //         price: { type: GraphQLFloat },
+    //         quantity: { type: GraphQLInt },
+    //         categoryId: { type: GraphQLID },
+    //         created: { type: GraphQLDateTime }
+    //     }
+    // }
+};
+
 // const rootMutation = new GraphQLObjectType({
 //     name: 'root_mutation',
 //     fields: rootMutationFields
@@ -152,7 +163,7 @@ const rootQuery = new GraphQLObjectType({
 
 const Schema = new GraphQLSchema({
     query: rootQuery,
-    mutation: undefined,//rootMutation,
+    mutation: undefined, //rootMutation,
     subscription: undefined, // TODO: Find a solution for Subscriptions
 });
 
