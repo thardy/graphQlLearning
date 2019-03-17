@@ -64,20 +64,59 @@ const ProductType = new GraphQLObjectType({
         name: { type: GraphQLString },
         description: { type: GraphQLString },
         price: { type: GraphQLFloat },
-        // quantity: { type: GraphQLInt },
-        // category: { type: CategoryType },
-        // created: { type: GraphQLDateTime }
+        quantity: { type: GraphQLInt },
+        category: { type: CategoryType },
+        created: { type: GraphQLDateTime }
     })
 });
 
+const ProductInputTypeFields = {
+    name: { type: GraphQLString },
+    description: { type: GraphQLString },
+    price: { type: GraphQLFloat },
+    quantity: { type: GraphQLInt },
+    categoryId: { type: GraphQLID },
+    created: { type: GraphQLDateTime }
+};
 const ProductInputType = new GraphQLInputObjectType({
     name: 'ProductInputType',
-    fields: () => ({
-        _id: { type: GraphQLID },
-        name: { type: GraphQLString },
-        quantity: { type: GraphQLInt },
-    }),
+    fields: () => (ProductInputTypeFields),
 });
+
+function findProductsUsingFilter(filter) {
+    return fakeDatabase.products.filter((product) => {
+        if (!filter) {
+            return true;
+        }
+        let found = false;
+        const idFilterPresent = !!filter._id;
+        const nameFilterPresent = !!filter.name;
+        const quantityFilterPresent = !!filter.quantity;
+
+        if (idFilterPresent) {
+            found = product._id === filter._id;
+            if (!found) {
+                return false;
+            }
+        }
+        if (nameFilterPresent) {
+            found = product.name.toLowerCase().includes(filter.name.toLowerCase());
+            if (!found) {
+                return false;
+            }
+        }
+        if (quantityFilterPresent) {
+            found = product.quantity === filter.quantity;
+            if (!found) {
+                return false;
+            }
+        }
+        if (!idFilterPresent && !nameFilterPresent && !quantityFilterPresent) {
+            found = true;
+        }
+        return found;
+    });
+}
 
 const rootQueryFields = {
     // categories: {
@@ -97,44 +136,12 @@ const rootQueryFields = {
             filter: { type: ProductInputType }
         },
         resolve: (root, {filter}) => {
-            const results = fakeDatabase.products.filter((product) => {
-                if (!filter) {
-                    return true;
-                }
-                let found = false;
-                const idFilterPresent = !!filter._id;
-                const nameFilterPresent = !!filter.name;
-                const quantityFilterPresent = !!filter.quantity;
-
-                if (idFilterPresent) {
-                    found = product._id === filter._id;
-                    if (!found) {
-                        return false;
-                    }
-                }
-                if (nameFilterPresent) {
-                    found = product.name.toLowerCase().includes(filter.name.toLowerCase());
-                    if (!found) {
-                        return false;
-                    }
-                }
-                if (quantityFilterPresent) {
-                    found = product.quantity === filter.quantity;
-                    if (!found) {
-                        return false;
-                    }
-                }
-                if (!idFilterPresent && !nameFilterPresent && !quantityFilterPresent) {
-                    found = true;
-                }
-                return found;
-            });
-
-            return results;
-
+            return findProductsUsingFilter(filter);
         }
     }
 };
+
+
 
 const rootQuery = new GraphQLObjectType({
     name: 'root_query',
@@ -144,15 +151,7 @@ const rootQuery = new GraphQLObjectType({
 const rootMutationFields = {
     create_product: {
         type: ProductType,
-        args: {
-            _id: { type: GraphQLID },
-            name: { type: GraphQLString },
-            description: { type: GraphQLString },
-            price: { type: GraphQLFloat },
-            quantity: { type: GraphQLInt },
-            categoryId: { type: GraphQLID },
-            created: { type: GraphQLDateTime }
-        },
+        args: ProductInputTypeFields,
         resolve: (root, args, context, info) => {
             const product = {
                 _id: new ObjectId().toString(),
@@ -160,6 +159,23 @@ const rootMutationFields = {
             };
             fakeDatabase.products.push(product);
             return product;
+        }
+    },
+    update_products: {
+        type: new GraphQLList(ProductType),
+        args: {
+            filter: { type: ProductInputType },
+            update: { type: ProductInputType }
+        },
+        resolve: (root, args, context, info) => {
+            const foundProducts = findProductsUsingFilter(args.filter);
+
+            foundProducts.forEach((product) => {
+                for(const prop in args.update) {
+                    product[prop] = args.update[prop];
+                }
+            });
+            return foundProducts;
         }
     }
 };
