@@ -96,7 +96,7 @@ const rootQueryFields = {
         args: {
             filter: { type: ProductInputType }
         },
-        resolve: (_, {filter}) => {
+        resolve: (root, {filter}) => {
             const results = fakeDatabase.products.filter((product) => {
                 if (!filter) {
                     return true;
@@ -142,28 +142,36 @@ const rootQuery = new GraphQLObjectType({
 });
 
 const rootMutationFields = {
-    // create_products: {
-    //     type: ProductType,
-    //     args: {
-    //         _id: { type: GraphQLID },
-    //         name: { type: GraphQLString },
-    //         description: { type: GraphQLString },
-    //         price: { type: GraphQLFloat },
-    //         quantity: { type: GraphQLInt },
-    //         categoryId: { type: GraphQLID },
-    //         created: { type: GraphQLDateTime }
-    //     }
-    // }
+    create_product: {
+        type: ProductType,
+        args: {
+            _id: { type: GraphQLID },
+            name: { type: GraphQLString },
+            description: { type: GraphQLString },
+            price: { type: GraphQLFloat },
+            quantity: { type: GraphQLInt },
+            categoryId: { type: GraphQLID },
+            created: { type: GraphQLDateTime }
+        },
+        resolve: (root, args, context, info) => {
+            const product = {
+                _id: new ObjectId().toString(),
+                ...args
+            };
+            fakeDatabase.products.push(product);
+            return product;
+        }
+    }
 };
 
-// const rootMutation = new GraphQLObjectType({
-//     name: 'root_mutation',
-//     fields: rootMutationFields
-// });
+const rootMutation = new GraphQLObjectType({
+    name: 'root_mutation',
+    fields: rootMutationFields
+});
 
 const Schema = new GraphQLSchema({
     query: rootQuery,
-    mutation: undefined, //rootMutation,
+    mutation: rootMutation,
     subscription: undefined, // TODO: Find a solution for Subscriptions
 });
 
