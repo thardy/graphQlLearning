@@ -177,7 +177,16 @@ const rootMutationFields = {
             });
             return foundProducts;
         }
-    }
+    },
+    delete_product: {
+        type: ProductType,
+        args: { _id: { type: GraphQLID } },
+        resolve: (root, args, context, info) => {
+            const index = fakeDatabase.products.findIndex((product) => product._id === args._id);
+            const deletedProducts = fakeDatabase.products.splice(index, 1);
+            return deletedProducts[0];
+        }
+    },
 };
 
 const rootMutation = new GraphQLObjectType({
