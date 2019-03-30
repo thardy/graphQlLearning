@@ -3,36 +3,39 @@ const {GraphQLSchema, GraphQLObjectType, GraphQLInputObjectType, GraphQLList, Gr
 const ObjectId = require('mongodb').ObjectID;
 
 const fakeDatabase = {
-    categories: {
-        'bad': {
+    categories: [
+        {
             _id: '5c8b9ddf972be631fa099720',
             name: 'bad',
         },
-        'mediocre': {
+        {
             _id: '5c8b9ded972be631fa099721',
             name: 'mediocre',
         },
-        'good': {
+        {
             _id: '5c8b9df9972be631fa099722',
             name: 'good',
         },
-    },
+    ],
     products: [
         {
             _id: '5c8b9e1a972be631fa099723',
             name: 'This is Product One',
+            categoryId: '5c8b9ddf972be631fa099720',
             description: 'Descriptions are for losers.',
             price: 10.99
         },
         {
             _id: '5c8b9e2c972be631fa099724',
             name: 'This is Product Two',
+            categoryId: '5c8b9ded972be631fa099721',
             description: 'Descriptions are for losers.',
             price: 0.99
         },
         {
             _id: '5c8b9e37972be631fa099725',
             name: 'This is Product Three',
+            categoryId: '5c8b9df9972be631fa099722',
             description: 'Descriptions are for losers.',
             price: 19.99
         },
@@ -41,42 +44,42 @@ const fakeDatabase = {
 
 const CategoryType = new GraphQLObjectType({
     name: 'CategoryType',
-    fields: () => ({
-        _id: {
-            type: GraphQLID
-        },
-        name: {
-            type: GraphQLString
-        },
-        description: {
-            type: GraphQLString
-        },
-        created: {
-            type: GraphQLDateTime
-        }
-    })
+    fields: () => {
+        return {
+            _id: {type: GraphQLID},
+            name: {type: GraphQLString},
+            description: {type: GraphQLString},
+            created: {type: GraphQLDateTime},
+        };
+    }
 });
 
 const ProductType = new GraphQLObjectType({
     name: 'ProductType',
-    fields: () => ({
-        _id: { type: GraphQLID },
-        name: { type: GraphQLString },
-        description: { type: GraphQLString },
-        price: { type: GraphQLFloat },
-        quantity: { type: GraphQLInt },
-        category: { type: CategoryType },
-        created: { type: GraphQLDateTime }
-    })
+    fields: () => {
+        return {
+            _id: {type: GraphQLID},
+            name: {type: GraphQLString},
+            categoryId: {type: GraphQLID},
+            description: {type: GraphQLString},
+            price: {type: GraphQLFloat},
+            quantity: {type: GraphQLInt},
+            created: {type: GraphQLDateTime},
+            updated: {type: GraphQLDateTime},
+            // navigation properties
+            category: {type: CategoryType},
+        };
+    }
 });
 
 const ProductInputTypeFields = {
     name: { type: GraphQLString },
+    categoryId: { type: GraphQLID },
     description: { type: GraphQLString },
     price: { type: GraphQLFloat },
     quantity: { type: GraphQLInt },
-    categoryId: { type: GraphQLID },
-    created: { type: GraphQLDateTime }
+    created: { type: GraphQLDateTime },
+    updated: { type: GraphQLDateTime }
 };
 const ProductInputType = new GraphQLInputObjectType({
     name: 'ProductInputType',
@@ -85,51 +88,64 @@ const ProductInputType = new GraphQLInputObjectType({
 
 function findProductsUsingFilter(filter) {
     return fakeDatabase.products.filter((product) => {
-        if (!filter) {
-            return true;
-        }
         let found = false;
-        const idFilterPresent = !!filter._id;
-        const nameFilterPresent = !!filter.name;
-        const quantityFilterPresent = !!filter.quantity;
 
-        if (idFilterPresent) {
-            found = product._id === filter._id;
-            if (!found) {
-                return false;
-            }
-        }
-        if (nameFilterPresent) {
-            found = product.name.toLowerCase().includes(filter.name.toLowerCase());
-            if (!found) {
-                return false;
-            }
-        }
-        if (quantityFilterPresent) {
-            found = product.quantity === filter.quantity;
-            if (!found) {
-                return false;
-            }
-        }
-        if (!idFilterPresent && !nameFilterPresent && !quantityFilterPresent) {
+        if (!filter) {
             found = true;
         }
+        else {
+            const idFilterPresent = !!filter._id;
+            const nameFilterPresent = !!filter.name;
+            const quantityFilterPresent = !!filter.quantity;
+
+            if (idFilterPresent) {
+                found = product._id === filter._id;
+                if (!found) {
+                    return false;
+                }
+            }
+            if (nameFilterPresent) {
+                found = product.name.toLowerCase().includes(filter.name.toLowerCase());
+                if (!found) {
+                    return false;
+                }
+            }
+            if (quantityFilterPresent) {
+                found = product.quantity === filter.quantity;
+                if (!found) {
+                    return false;
+                }
+            }
+            if (!idFilterPresent && !nameFilterPresent && !quantityFilterPresent) {
+                found = true;
+            }
+        }
+
+        if (found) {
+            const category = fakeDatabase.categories.find((category) => {
+                return category._id === product.categoryId;
+            });
+            product.category = category;
+        }
+
         return found;
     });
 }
 
 const rootQueryFields = {
-    // categories: {
-    //     type: CategoryType,
-    //     args: {
-    //         id: { type: GraphQLID }
-    //     },
-    //     resolve: ???
-    // },
-    // info: {
-    //     type: GraphQLString,
-    //     resolve: () => `This is my practice, manually-created GraphQL Api!!!`
-    // },
+    getAllCategories: {
+        type: new GraphQLList(CategoryType),
+        args: {
+            id: { type: GraphQLID }
+        },
+        resolve: (root) => {
+            return fakeDatabase.categories;
+        }
+    },
+    info: {
+        type: GraphQLString,
+        resolve: () => `This is my practice, manually-created GraphQL Api!!!`
+    },
     products: {
         type: new GraphQLList(ProductType),
         args: {
