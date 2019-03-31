@@ -121,13 +121,6 @@ function findProductsUsingFilter(filter) {
             }
         }
 
-        if (found) {
-            const category = fakeDatabase.categories.find((category) => {
-                return category._id === product.categoryId;
-            });
-            product.category = category;
-        }
-
         return found;
     });
 }
@@ -151,8 +144,29 @@ const rootQueryFields = {
         args: {
             filter: { type: ProductInputType }
         },
-        resolve: (root, {filter}) => {
-            return findProductsUsingFilter(filter);
+        resolve: (root, {filter}, context, info) => {
+            const foundProducts = findProductsUsingFilter(filter);
+            const requestedFields = info.fieldNodes[0].selectionSet.selections;
+            let categoryFieldRequested = false;
+
+            for(let field of requestedFields) {
+                if (field.name.value === 'category') {
+                    categoryFieldRequested = true;
+                    break;
+                }
+            }
+
+            if (categoryFieldRequested) {
+                // todo: if there's a bulk fetch (provide a delimited list of ids or something), this would be a good place to use it.
+                foundProducts.forEach((product) => {
+                    const category = fakeDatabase.categories.find((category) => {
+                        return category._id === product.categoryId;
+                    });
+                    product.category = category;
+                });
+            }
+
+            return foundProducts;
         }
     }
 };
