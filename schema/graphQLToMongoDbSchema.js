@@ -1,3 +1,4 @@
+const { getGraphQLUpdateArgs, getMongoDbUpdateResolver, getGraphQLQueryArgs, getMongoDbQueryResolver } = require('graphql-to-mongodb');
 const {GraphQLDateTime} = require('graphql-iso-date');
 const {GraphQLSchema, GraphQLObjectType, GraphQLInputObjectType, GraphQLList, GraphQLID, GraphQLString, GraphQLFloat, GraphQLInt, GraphQLNonNull} = require('graphql');
 const ObjectId = require('mongodb').ObjectID;
@@ -141,10 +142,8 @@ const rootQueryFields = {
     },
     products: {
         type: new GraphQLList(ProductType),
-        args: {
-            filter: { type: ProductInputType }
-        },
-        resolve: (root, {filter}, context, info) => {
+        args: getGraphQLQueryArgs(ProductInputType),// ( filter: { type: ProductInputType } },
+        resolve: getMongoDbQueryResolver(ProductType, (filter, projection, options, obj, args, context) => {//(root, {filter}, context, info) => {
             const foundProducts = findProductsUsingFilter(filter);
             const requestedFields = info.fieldNodes[0].selectionSet.selections;
             let categoryFieldRequested = false;

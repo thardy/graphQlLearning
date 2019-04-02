@@ -1,5 +1,7 @@
 const express = require('express');
-const schema = require('./schema/schema');
+//const schema = require('./schema/manualSchema');
+const schema = require('./schema/mongoDbPoweredSchema');
+// const schema = require('./schema/graphQLToMongoDbSchema');
 //var graphQLHTTP = require('express-graphql');
 const {ApolloServer, makeExecutableSchema} = require('apollo-server-express');
 const mongodb = require('mongodb');
