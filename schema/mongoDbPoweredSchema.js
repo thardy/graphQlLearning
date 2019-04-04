@@ -27,7 +27,15 @@ const ProductType = new GraphQLObjectType({
             created: {type: GraphQLDateTime},
             updated: {type: GraphQLDateTime},
             // navigation properties
-            category: {type: CategoryType},
+            category: {
+                type: CategoryType,
+                resolve: async (product, {ignoredFilter}, context) => {
+                    const filter = {_id: product.categoryId };
+                    convertStringIdToObjectId(filter);
+                    const category = await context.db.collection('categories').findOne(filter);
+                    return category;
+                }
+            },
         };
     }
 });
@@ -106,7 +114,6 @@ const rootQueryFields = {
             filter: { type: ProductInputType }
         },
         resolve: async (root, {filter}, context, info) => {
-            // todo: either simplify this just to get it working, or skip it and move straight to graphql-to-mongodb implementation
             convertStringIdToObjectId(filter);
             const foundProducts = await context.db.collection('products').find(filter).toArray();
 
@@ -185,11 +192,12 @@ const rootMutationFields = {
 
 convertStringIdToObjectId = (filter) => {
     if (filter['_id']) {
-        for (let property in  filter['_id']) {
-            if (filter['_id'].hasOwnProperty(property)) {
-                filter['_id'][property] = new ObjectID(filter['_id'][property]);
-            }
-        }
+        filter['_id'] = new ObjectId(filter['_id']);
+        // for (let property in  filter['_id']) {
+        //     if (filter['_id'].hasOwnProperty(property)) {
+        //         filter['_id'][property] = new ObjectId(filter['_id'][property]);
+        //     }
+        // }
     }
 };
 
