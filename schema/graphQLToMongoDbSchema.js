@@ -1,47 +1,7 @@
 const { getGraphQLUpdateArgs, getMongoDbUpdateResolver, getGraphQLQueryArgs, getMongoDbQueryResolver } = require('graphql-to-mongodb');
 const {GraphQLDateTime} = require('graphql-iso-date');
-const {GraphQLSchema, GraphQLObjectType, GraphQLInputObjectType, GraphQLList, GraphQLID, GraphQLString, GraphQLFloat, GraphQLInt, GraphQLNonNull} = require('graphql');
+const {GraphQLSchema, GraphQLObjectType, GraphQLInputObjectType, GraphQLList, GraphQLID, GraphQLString, GraphQLFloat, GraphQLInt, GraphQLBoolean, GraphQLNonNull} = require('graphql');
 const ObjectId = require('mongodb').ObjectID;
-
-const fakeDatabase = {
-    categories: [
-        {
-            _id: '5c8b9ddf972be631fa099720',
-            name: 'bad',
-        },
-        {
-            _id: '5c8b9ded972be631fa099721',
-            name: 'mediocre',
-        },
-        {
-            _id: '5c8b9df9972be631fa099722',
-            name: 'good',
-        },
-    ],
-    products: [
-        {
-            _id: '5c8b9e1a972be631fa099723',
-            name: 'This is Product One',
-            categoryId: '5c8b9ddf972be631fa099720',
-            description: 'Descriptions are for losers.',
-            price: 10.99
-        },
-        {
-            _id: '5c8b9e2c972be631fa099724',
-            name: 'This is Product Two',
-            categoryId: '5c8b9ded972be631fa099721',
-            description: 'Descriptions are for losers.',
-            price: 0.99
-        },
-        {
-            _id: '5c8b9e37972be631fa099725',
-            name: 'This is Product Three',
-            categoryId: '5c8b9df9972be631fa099722',
-            description: 'Descriptions are for losers.',
-            price: 19.99
-        },
-    ]
-};
 
 const CategoryType = new GraphQLObjectType({
     name: 'CategoryType',
@@ -68,8 +28,31 @@ const ProductType = new GraphQLObjectType({
             created: {type: GraphQLDateTime},
             updated: {type: GraphQLDateTime},
             // navigation properties
-            category: {type: CategoryType},
+            category: {
+                type: CategoryType,
+                resolve: async (product, {ignoredFilter}, context) => {
+                    const filter = {_id: product.categoryId };
+                    convertStringIdToObjectId(filter);
+                    const category = await context.db.collection('categories').findOne(filter);
+                    return category;
+                }
+            },
         };
+    }
+});
+
+const MongoResultType = new GraphQLObjectType({
+    name: 'MongoResultType',
+    fields: {
+        ok: {
+            type: GraphQLBoolean
+        },
+        n: {
+            type: GraphQLInt,
+        },
+        nModified: {
+            type: GraphQLInt,
+        },
     }
 });
 
@@ -87,53 +70,17 @@ const ProductInputType = new GraphQLInputObjectType({
     fields: () => (ProductInputTypeFields),
 });
 
-function findProductsUsingFilter(filter) {
-    return fakeDatabase.products.filter((product) => {
-        let found = false;
-
-        if (!filter) {
-            found = true;
-        }
-        else {
-            const idFilterPresent = !!filter._id;
-            const nameFilterPresent = !!filter.name;
-            const quantityFilterPresent = !!filter.quantity;
-
-            if (idFilterPresent) {
-                found = product._id === filter._id;
-                if (!found) {
-                    return false;
-                }
-            }
-            if (nameFilterPresent) {
-                found = product.name.toLowerCase().includes(filter.name.toLowerCase());
-                if (!found) {
-                    return false;
-                }
-            }
-            if (quantityFilterPresent) {
-                found = product.quantity === filter.quantity;
-                if (!found) {
-                    return false;
-                }
-            }
-            if (!idFilterPresent && !nameFilterPresent && !quantityFilterPresent) {
-                found = true;
-            }
-        }
-
-        return found;
-    });
-}
-
 const rootQueryFields = {
+    // todo: change this to not accept any args and add a getCategoryById query field
     getAllCategories: {
         type: new GraphQLList(CategoryType),
         args: {
             id: { type: GraphQLID }
         },
-        resolve: (root) => {
-            return fakeDatabase.categories;
+        resolve: async (root, args, context) => {
+            const collectionName = 'categories';
+            const allCategories = await context.db.collection(collectionName).find().toArray();
+            return allCategories;
         }
     },
     info: {
@@ -142,31 +89,16 @@ const rootQueryFields = {
     },
     products: {
         type: new GraphQLList(ProductType),
-        args: getGraphQLQueryArgs(ProductInputType),// ( filter: { type: ProductInputType } },
-        resolve: getMongoDbQueryResolver(ProductType, (filter, projection, options, obj, args, context) => {//(root, {filter}, context, info) => {
-            const foundProducts = findProductsUsingFilter(filter);
-            const requestedFields = info.fieldNodes[0].selectionSet.selections;
-            let categoryFieldRequested = false;
-
-            for(let field of requestedFields) {
-                if (field.name.value === 'category') {
-                    categoryFieldRequested = true;
-                    break;
-                }
+        args: getGraphQLQueryArgs(ProductInputType),
+        resolve: getMongoDbQueryResolver(
+            ProductType,
+            async (filter, projection, options, obj, args, context) => {
+                const collectionName = 'products';
+                options.projection = projection;
+                convertStringIdToObjectId(filter);
+                return await context.db.collection(collectionName).find(filter, options).toArray();
             }
-
-            if (categoryFieldRequested) {
-                // todo: if there's a bulk fetch (provide a delimited list of ids or something), this would be a good place to use it.
-                foundProducts.forEach((product) => {
-                    const category = fakeDatabase.categories.find((category) => {
-                        return category._id === product.categoryId;
-                    });
-                    product.category = category;
-                });
-            }
-
-            return foundProducts;
-        }
+        )
     }
 };
 
@@ -181,41 +113,61 @@ const rootMutationFields = {
     create_product: {
         type: ProductType,
         args: ProductInputTypeFields,
-        resolve: (root, args, context, info) => {
-            const product = {
-                _id: new ObjectId().toString(),
-                ...args
-            };
-            fakeDatabase.products.push(product);
-            return product;
+        resolve: async (root, args, context, info) => {
+            // const product = {
+            //     _id: new ObjectId().toString(),
+            //     ...args
+            // };
+            // fakeDatabase.products.push(product);
+
+            const collectionName = 'products';
+            const result = await context.db.collection(collectionName).insert(args)      ;
+            return result.ops[0];
         }
     },
     update_products: {
-        type: new GraphQLList(ProductType),
-        args: {
-            filter: { type: ProductInputType },
-            update: { type: ProductInputType }
-        },
-        resolve: (root, args, context, info) => {
-            const foundProducts = findProductsUsingFilter(args.filter);
-
-            foundProducts.forEach((product) => {
-                for(const prop in args.update) {
-                    product[prop] = args.update[prop];
-                }
-            });
-            return foundProducts;
-        }
+        type: MongoResultType,//new GraphQLList(ProductType),
+        args: getGraphQLUpdateArgs(ProductInputType),
+        resolve: getMongoDbUpdateResolver(
+            ProductType,
+            async (filter, update, options, projection, source, args, context, info) => {
+                const collectionName = 'products';
+                convertStringIdToObjectId(filter);
+                const result = await context.db.collection(collectionName).updateMany(filter, update, options);
+                return result.result;
+            },
+            {
+                differentOutputType: true,
+            }
+        )
     },
     delete_product: {
-        type: ProductType,
-        args: { _id: { type: GraphQLID } },
-        resolve: (root, args, context, info) => {
-            const index = fakeDatabase.products.findIndex((product) => product._id === args._id);
-            const deletedProducts = fakeDatabase.products.splice(index, 1);
-            return deletedProducts[0];
-        }
+        type: MongoResultType,
+        args: getGraphQLQueryArgs(ProductInputType),
+        resolve: getMongoDbQueryResolver(
+            ProductType,
+            async (filter, projection, options, obj, args, context) => {
+                const collectionName = 'products';
+                convertStringIdToObjectId(filter);
+                const result = await context.db.collection(collectionName).deleteMany(filter, options);
+                return result.result;
+            },
+            {
+                differentOutputType: true,
+            }
+        )
     },
+};
+
+convertStringIdToObjectId = (filter) => {
+    if (filter && filter['_id']) {
+        filter['_id'] = new ObjectId(filter['_id']);
+        // for (let property in  filter['_id']) {
+        //     if (filter['_id'].hasOwnProperty(property)) {
+        //         filter['_id'][property] = new ObjectId(filter['_id'][property]);
+        //     }
+        // }
+    }
 };
 
 const rootMutation = new GraphQLObjectType({

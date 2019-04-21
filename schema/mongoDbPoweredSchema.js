@@ -76,8 +76,11 @@ const rootQueryFields = {
         args: {
             id: { type: GraphQLID }
         },
-        resolve: (root) => {
-            return fakeDatabase.categories;
+        resolve: async (root) => {
+            // return fakeDatabase.categories;
+            const collectionName = 'categories';
+            const allCategories = await context.db.collection(collectionName).find().toArray();
+            return allCategories;
         }
     },
     info: {
@@ -201,44 +204,5 @@ const Schema = new GraphQLSchema({
     mutation: rootMutation,
     subscription: undefined, // TODO: Find a solution for Subscriptions
 });
-
-function findProductsUsingFilter(filter) {
-    return fakeDatabase.products.filter((product) => {
-        let found = false;
-
-        if (!filter) {
-            found = true;
-        }
-        else {
-            const idFilterPresent = !!filter._id;
-            const nameFilterPresent = !!filter.name;
-            const quantityFilterPresent = !!filter.quantity;
-
-            if (idFilterPresent) {
-                found = product._id === filter._id;
-                if (!found) {
-                    return false;
-                }
-            }
-            if (nameFilterPresent) {
-                found = product.name.toLowerCase().includes(filter.name.toLowerCase());
-                if (!found) {
-                    return false;
-                }
-            }
-            if (quantityFilterPresent) {
-                found = product.quantity === filter.quantity;
-                if (!found) {
-                    return false;
-                }
-            }
-            if (!idFilterPresent && !nameFilterPresent && !quantityFilterPresent) {
-                found = true;
-            }
-        }
-
-        return found;
-    });
-}
 
 module.exports = Schema;
