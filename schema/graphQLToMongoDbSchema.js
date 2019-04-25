@@ -141,14 +141,15 @@ const rootMutationFields = {
             }
         )
     },
-    delete_product: {
+    delete_product_byid: {
         type: MongoResultType,
-        args: getGraphQLQueryArgs(ProductInputType),
+        //args: getGraphQLQueryArgs(ProductType),
+        args: getGraphQLQueryArgs(new GraphQLInputObjectType({ name: 'deleteByIdType', fields: () => ({_id: {type: GraphQLID}}) })),
         resolve: getMongoDbQueryResolver(
             ProductType,
             async (filter, projection, options, obj, args, context) => {
                 const collectionName = 'products';
-                convertStringIdToObjectId(filter);
+                convertFilterObjectIdsToObjectIds(filter);
                 const result = await context.db.collection(collectionName).deleteMany(filter, options);
                 return result.result;
             },
@@ -167,6 +168,16 @@ convertStringIdToObjectId = (filter) => {
         //         filter['_id'][property] = new ObjectId(filter['_id'][property]);
         //     }
         // }
+    }
+};
+
+convertFilterObjectIdsToObjectIds = (filter) => {
+    if (filter['_id']) {
+        for (let property in  filter['_id']) {
+            if (filter['_id'].hasOwnProperty(property)) {
+                filter['_id'][property] = new ObjectId(filter['_id'][property]);
+            }
+        }
     }
 };
 
