@@ -54,6 +54,18 @@ const CategoryType = new GraphQLObjectType({
     }
 });
 
+// if this is the base, core, whatever
+const ProductInputTypeFields = {
+    name: { type: GraphQLString },
+    categoryId: { type: GraphQLID },
+    description: { type: GraphQLString },
+    price: { type: GraphQLFloat },
+    quantity: { type: GraphQLInt },
+    created: { type: GraphQLDateTime },
+    updated: { type: GraphQLDateTime }
+};
+
+// then this is the base plus an id, and any navigation properties
 const ProductType = new GraphQLObjectType({
     name: 'ProductType',
     fields: () => {
@@ -72,15 +84,6 @@ const ProductType = new GraphQLObjectType({
     }
 });
 
-const ProductInputTypeFields = {
-    name: { type: GraphQLString },
-    categoryId: { type: GraphQLID },
-    description: { type: GraphQLString },
-    price: { type: GraphQLFloat },
-    quantity: { type: GraphQLInt },
-    created: { type: GraphQLDateTime },
-    updated: { type: GraphQLDateTime }
-};
 const ProductInputType = new GraphQLInputObjectType({
     name: 'ProductInputType',
     fields: () => (ProductInputTypeFields),
