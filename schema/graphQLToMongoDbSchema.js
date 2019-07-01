@@ -152,7 +152,7 @@ const rootMutationFields = {
             ProductType,
             async (filter, projection, options, obj, args, context) => {
                 const collectionName = 'products';
-                convertFilterObjectIdsToObjectIds(filter);
+                convertFilterStringIdsToObjectIds(filter);
                 const result = await context.db.collection(collectionName).deleteMany(filter, options);
                 return result.result;
             },
@@ -174,7 +174,7 @@ convertStringIdToObjectId = (filter) => {
     }
 };
 
-convertFilterObjectIdsToObjectIds = (filter) => {
+convertFilterStringIdsToObjectIds = (filter) => {
     if (filter['_id']) {
         for (let property in  filter['_id']) {
             if (filter['_id'].hasOwnProperty(property)) {
