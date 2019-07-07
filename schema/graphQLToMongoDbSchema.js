@@ -16,7 +16,17 @@ const CategoryType = new GraphQLObjectType({
 });
 
 // if this is the base, core, whatever
+// const ProductInputTypeFields = {
+//     name: { type: GraphQLString },
+//     categoryId: { type: GraphQLID },
+//     description: { type: GraphQLString },
+//     price: { type: GraphQLFloat },
+//     quantity: { type: GraphQLInt },
+//     created: { type: GraphQLDateTime },
+//     updated: { type: GraphQLDateTime }
+// };
 const ProductInputTypeFields = {
+    _id: {type: GraphQLID},
     name: { type: GraphQLString },
     categoryId: { type: GraphQLID },
     description: { type: GraphQLString },
@@ -26,30 +36,21 @@ const ProductInputTypeFields = {
     updated: { type: GraphQLDateTime }
 };
 
-// then this is the base plus an id, and any navigation properties
+// then this is the base plus any navigation properties
 const ProductType = new GraphQLObjectType({
     name: 'ProductType',
-    fields: () => {
-        return {
-            _id: {type: GraphQLID},
-            name: {type: GraphQLString},
-            categoryId: {type: GraphQLID},
-            description: {type: GraphQLString},
-            price: {type: GraphQLFloat},
-            quantity: {type: GraphQLInt},
-            created: {type: GraphQLDateTime},
-            updated: {type: GraphQLDateTime},
-            // navigation properties
-            category: {
-                type: CategoryType,
-                resolve: async (product, {ignoredFilter}, context) => {
-                    const filter = {_id: product.categoryId };
-                    convertStringIdToObjectId(filter);
-                    const category = await context.db.collection('categories').findOne(filter);
-                    return category;
-                }
-            },
-        };
+    fields: {
+        ...ProductInputTypeFields,
+        // navigation properties
+        category: {
+            type: CategoryType,
+            resolve: async (product, {ignoredFilter}, context) => {
+                const filter = {_id: product.categoryId };
+                convertStringIdToObjectId(filter);
+                const category = await context.db.collection('categories').findOne(filter);
+                return category;
+            }
+        },
     }
 });
 
@@ -98,7 +99,7 @@ const rootQueryFields = {
             async (filter, projection, options, obj, args, context) => {
                 const collectionName = 'products';
                 options.projection = projection;
-                convertStringIdToObjectId(filter);
+                convertFilterStringIdsToObjectIds(filter);
                 return await context.db.collection(collectionName).find(filter, options).toArray();
             }
         )
@@ -135,7 +136,8 @@ const rootMutationFields = {
             ProductType,
             async (filter, update, options, projection, source, args, context, info) => {
                 const collectionName = 'products';
-                convertStringIdToObjectId(filter);
+                //convertStringIdToObjectId(filter);
+                convertFilterStringIdsToObjectIds(filter);
                 const result = await context.db.collection(collectionName).updateMany(filter, update, options);
                 return result.result;
             },
@@ -175,7 +177,7 @@ convertStringIdToObjectId = (filter) => {
 };
 
 convertFilterStringIdsToObjectIds = (filter) => {
-    if (filter['_id']) {
+    if (filter && filter['_id']) {
         for (let property in  filter['_id']) {
             if (filter['_id'].hasOwnProperty(property)) {
                 filter['_id'][property] = new ObjectId(filter['_id'][property]);
