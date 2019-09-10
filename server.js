@@ -25,21 +25,51 @@ const assert = require('assert');
     const app = express();
     const port = 4001 || process.env;
 
-    const server = new ApolloServer({
-        schema,
+    // const server = new ApolloServer({
+    //     schema,
+    //     context: {db: db},
+    //     playground: {
+    //         endpoint: `http://localhost:${port}/graphql`,
+    //         settings: {
+    //             'editor.theme': 'dark',
+    //             'editor.cursorShape': 'line',
+    //         }
+    //     }
+    // });
+    //
+    // server.applyMiddleware({
+    //     app: app,
+    // });
+
+    // experiment BEGIN
+    // using 2 separate instances
+    // 1 for iql and the other for client access
+    const apolloPlaygroundServer = new ApolloServer({
+        schema: schema,
+        introspection: true,
         context: {db: db},
         playground: {
-            endpoint: `http://localhost:${port}/graphql`,
+            endpoint: `http://localhost:${port}/graphql-api`,
             settings: {
                 'editor.theme': 'dark',
+                'request.credentials': 'include',
                 'editor.cursorShape': 'line',
             }
         }
     });
 
-    server.applyMiddleware({
-        app: app
+    const apolloApiServer = new ApolloServer({
+        schema: schema,
+        introspection: true,
+        playground: false,
+        context: {db: db}
     });
+
+
+    // attach to express
+    apolloApiServer.applyMiddleware({ app, path: "/graphql-api" });
+    apolloPlaygroundServer.applyMiddleware({ app, path: "/graphql" });
+    // experiment END
 
     app.listen(port, () => {
         console.log(`The server has started on port: ${port}`);
