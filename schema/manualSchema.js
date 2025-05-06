@@ -161,6 +161,8 @@ const rootQueryFields = {
             }
 
             if (categoryFieldRequested) {
+                // the category field was requested on the results, so go fetch the category for each product in our resultset and attach
+                //  it to the product.  this is the join step.
                 // todo: if there's a bulk fetch (provide a delimited list of ids or something), this would be a good place to use it.
                 foundProducts.forEach((product) => {
                     const category = fakeDatabase.categories.find((category) => {
